@@ -49,7 +49,7 @@ from geonature.utils.utilsgeometrytools import export_as_geo_file
 
 from geonature.core.users.models import UserRigth
 from geonature.core.gn_permissions import decorators as permissions
-from geonature.core.gn_permissions.tools import get_or_fetch_user_cruved
+from geonature.core.gn_permissions.tools import get_scopes_by_action
 
 
 blueprint = Blueprint("pr_occtax", __name__)
@@ -66,9 +66,9 @@ def set_current_module(endpoint, values):
 
 @blueprint.route("/<module_code>/releves", methods=["GET"])
 @blueprint.route("/releves", methods=["GET"])
-@permissions.check_cruved_scope("R", True)
+@permissions.check_cruved_scope("R", get_scope=True)
 @json_resp
-def getReleves(info_role):
+def getReleves(scope):
     """
     Route for map list web interface
 
@@ -77,7 +77,7 @@ def getReleves(info_role):
     """
 
     releve_repository = ReleveRepository(TRelevesOccurrence)
-    q = releve_repository.get_filtered_query(info_role)
+    q = releve_repository.get_filtered_query(g.current_user, scope)
 
     parameters = request.args
 
@@ -100,10 +100,7 @@ def getReleves(info_role):
     # Pour obtenir le nombre de résultat de la requete sans le LIMIT
     nb_results_without_limit = query_without_limit.count()
 
-    user = info_role
-    user_cruved = get_or_fetch_user_cruved(
-        session=session, id_role=info_role.id_role, module_code=g.current_module.module_code
-    )
+    user_cruved = get_scopes_by_action(module_code=g.current_module.module_code)
 
     featureCollection = []
     for n in data:
@@ -185,8 +182,8 @@ def getOneCounting(id_counting):
 
 @blueprint.route("/<module_code>/releve/<int:id_releve>", methods=["GET"])
 @blueprint.route("/releve/<int:id_releve>", methods=["GET"])
-@permissions.check_cruved_scope("R", True)
-def getOneReleve(id_releve, info_role):
+@permissions.check_cruved_scope("R", get_scope=True)
+def getOneReleve(id_releve, scope):
     """
     Get one releve
 
@@ -203,10 +200,10 @@ def getOneReleve(id_releve, info_role):
     if not releve:
         raise NotFound('The releve "{}" does not exist'.format(id_releve))
     # check if the user is autorized
-    releve = releve.get_releve_if_allowed(info_role)
+    releve = releve.get_releve_if_allowed(g.current_user, scope)
 
     user_cruved = get_or_fetch_user_cruved(
-        session=session, id_role=info_role.id_role, module_code=g.current_module.module_code
+        session=session, id_role=g.current_user.id_role, module_code=g.current_module.module_code
     )
 
     releve_cruved = {
@@ -215,77 +212,17 @@ def getOneReleve(id_releve, info_role):
             "id": releve.id_releve_occtax,
             "geometry": releve.geom_4326,
         },
-        "cruved": releve.get_releve_cruved(info_role, user_cruved),
+        "cruved": releve.get_releve_cruved(g.current_user, user_cruved),
     }
 
     return releveCruvedSchema.dump(releve_cruved)
 
 
-@blueprint.route("/<module_code>/vreleveocctax", methods=["GET"])
-@blueprint.route("/vreleveocctax", methods=["GET"])
-@permissions.check_cruved_scope("R", True)
-@json_resp
-def getViewReleveOccurrence(info_role):
-    """
-    Deprecated
-    """
-    releve_repository = ReleveRepository(VReleveOccurrence)
-    q = releve_repository.get_filtered_query(info_role)
-
-    parameters = request.args
-
-    nbResultsWithoutFilter = DB.session.query(VReleveOccurrence).count()
-
-    limit = int(parameters.get("limit")) if parameters.get("limit") else 100
-    page = int(parameters.get("offset")) if parameters.get("offset") else 0
-
-    # Filters
-    for param in parameters:
-        if param in VReleveOccurrence.__table__.columns:
-            col = getattr(VReleveOccurrence.__table__.columns, param)
-            q = q.filter(col == parameters[param])
-
-    # Order by
-    if "orderby" in parameters:
-        if parameters.get("orderby") in VReleveOccurrence.__table__.columns:
-            orderCol = getattr(VReleveOccurrence.__table__.columns, parameters["orderby"])
-
-        if "order" in parameters:
-            if parameters["order"] == "desc":
-                orderCol = orderCol.desc()
-
-        q = q.order_by(orderCol)
-
-    data = q.limit(limit).offset(page * limit).all()
-
-    user = info_role
-    user_cruved = get_or_fetch_user_cruved(
-        session=session,
-        id_role=info_role.id_role,
-        module_code=g.current_module.module_code,
-        id_application_parent=current_app.config["ID_APPLICATION_GEONATURE"],
-    )
-    featureCollection = []
-
-    for n in data:
-        releve_cruved = n.get_releve_cruved(user, user_cruved)
-        feature = n.get_geofeature()
-        feature["properties"]["rights"] = releve_cruved
-        featureCollection.append(feature)
-
-    if data:
-        return {
-            "items": FeatureCollection(featureCollection),
-            "total": nbResultsWithoutFilter,
-        }
-    return {"message": "not found"}, 404
-
-
 @blueprint.route("/<module_code>/releve", methods=["POST"])
 @blueprint.route("/releve", methods=["POST"])
-@permissions.check_cruved_scope("C", True)
+@permissions.check_cruved_scope("C", get_scope=True)
 @json_resp
-def insertOrUpdateOneReleve(info_role):
+def insertOrUpdateOneReleve(scope):
     """
     Route utilisée depuis l'appli mobile => depreciée et non utilisée par l'appli web
     Post one Occtax data (Releve + Occurrence + Counting)
@@ -380,28 +317,29 @@ def insertOrUpdateOneReleve(info_role):
     if releve.id_releve_occtax:
         # get update right of the user
         user_cruved = get_or_fetch_user_cruved(
-            session=session, id_role=info_role.id_role, module_code=g.current_module.module_code
+            session=session,
+            id_role=g.current_user.id_role,
+            module_code=g.current_module.module_code,
         )
         update_code_filter = user_cruved["U"]
-        # info_role.code_action = update_data_scope
         user = UserRigth(
-            id_role=info_role.id_role,
+            id_role=g.current_user.id_role,
             value_filter=update_code_filter,
             code_action="U",
-            id_organisme=info_role.id_organisme,
+            id_organisme=g.current_user.id_organisme,
         )
-        releve = releveRepository.update(releve, user, shape)
+        releve = releveRepository.update(releve, g.current_user, int(user.value_filter), shape)
     # if its a simple post
     else:
         # set id_digitiser
-        releve.id_digitiser = info_role.id_role
-        if info_role.value_filter in ("0", "1", "2"):
+        releve.id_digitiser = g.current_user.id_role
+        if scope in (0, 1, 2):
             # Check if user can add a releve in the current dataset
-            allowed = releve.user_is_in_dataset_actor(info_role)
+            allowed = releve.user_is_in_dataset_actor(scope)
             if not allowed:
                 raise Forbidden(
                     "User {} has no right in dataset {}".format(
-                        info_role.id_role, releve.id_dataset
+                        g.current_user.id_role, releve.id_dataset
                     )
                 )
         DB.session.add(releve)
@@ -411,7 +349,7 @@ def insertOrUpdateOneReleve(info_role):
     return releve.get_geofeature(depth=depth)
 
 
-def releveHandler(request, *, releve, info_role):
+def releveHandler(request, *, releve):
     releveSchema = ReleveSchema()
     # Modification de la requete geojson en releve
     json_req = request.get_json()
@@ -424,18 +362,8 @@ def releveHandler(request, *, releve, info_role):
         raise BadRequest(error.messages)
     # Test des droits d'édition du relevé
     if releve.id_releve_occtax is not None:
-        user_cruved = get_or_fetch_user_cruved(
-            session=session, id_role=info_role.id_role, module_code=g.current_module.module_code
-        )
-        # info_role.code_action = update_data_scope
-        user = UserRigth(
-            id_role=info_role.id_role,
-            value_filter=user_cruved["U"],
-            code_action="U",
-            id_organisme=info_role.id_organisme,
-        )
-
-        releve = releve.get_releve_if_allowed(user)
+        scope = get_scopes_by_action(module_code=g.current_module.module_code)["U"]
+        releve = releve.get_releve_if_allowed(g.current_user, scope)
         # fin test, si ici => c'est ok
     # if creation
     else:
@@ -525,25 +453,11 @@ def updateReleve(id_releve, info_role):
     }
 
 
-def occurrenceHandler(request, *, occurrence, info_role):
-
+def occurrenceHandler(request, *, occurrence):
     releve = TRelevesOccurrence.query.get_or_404(occurrence.id_releve_occtax)
 
-    # Test des droits d'édition du relevé si modification
-    if occurrence.id_occurrence_occtax is not None:
-        user_cruved = get_or_fetch_user_cruved(
-            session=session, id_role=info_role.id_role, module_code=g.current_module.module_code
-        )
-        # info_role.code_action = update_data_scope
-        info_role = UserRigth(
-            id_role=info_role.id_role,
-            value_filter=user_cruved["U"],
-            code_action="U",
-            id_organisme=info_role.id_organisme,
-        )
-
-    releve = releve.get_releve_if_allowed(info_role)
-    # fin test, si ici => c'est ok
+    scope = get_scopes_by_action(module_code=g.current_module.module_code)["U"]
+    releve = releve.get_releve_if_allowed(g.current_user, scope)
 
     occurrenceSchema = OccurrenceSchema()
     try:
@@ -559,8 +473,8 @@ def occurrenceHandler(request, *, occurrence, info_role):
 
 @blueprint.route("/<module_code>/releve/<int:id_releve>/occurrence", methods=["POST"])
 @blueprint.route("/releve/<int:id_releve>/occurrence", methods=["POST"])
-@permissions.check_cruved_scope("C", True)
-def createOccurrence(id_releve, info_role):
+@permissions.check_cruved_scope("C", get_scope=True)
+def createOccurrence(id_releve, scope):
     """
     Post one Occurrence data (Occurrence + Counting) for add to Releve
 
@@ -575,8 +489,8 @@ def createOccurrence(id_releve, info_role):
 
 @blueprint.route("/<module_code>/occurrence/<int:id_occurrence>", methods=["POST"])
 @blueprint.route("/occurrence/<int:id_occurrence>", methods=["POST"])
-@permissions.check_cruved_scope("U", True)
-def updateOccurrence(id_occurrence, info_role):
+@permissions.check_cruved_scope("U", get_scope=True)
+def updateOccurrence(id_occurrence, scope):
     """
     Post one Occurrence data (Occurrence + Counting) for add to Releve
 
