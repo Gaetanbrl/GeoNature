@@ -68,7 +68,7 @@ export class OccHabMapListComponent implements OnInit {
 
   getStations(params?) {
     this.dataLoading = true;
-    this._occHabDataService.getStations(params).subscribe(
+    this._occHabDataService.listStations(params).subscribe(
       featuresCollection => {
         // store the idsStation in the store service
         if (

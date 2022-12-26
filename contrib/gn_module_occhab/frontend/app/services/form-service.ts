@@ -12,6 +12,7 @@ import { FormService } from "@geonature_common/form/form.service";
 import { DataFormService } from "@geonature_common/form/data-form.service";
 import { OcchabStoreService } from "./store.service";
 import { ModuleConfig } from "../module.config";
+import { Station, StationFeature } from "../models";
 
 @Injectable()
 export class OcchabFormService {
@@ -58,7 +59,7 @@ export class OcchabFormService {
       id_nomenclature_geographic_object: [null, Validators.required],
       geom_4326: [null, Validators.required],
       comment: null,
-      t_habitats: this._fb.array([])
+      habitats: this._fb.array([])
     });
     stationForm.setValidators([
       this._formService.dateValidator(
@@ -87,7 +88,6 @@ export class OcchabFormService {
 
   initHabForm(defaultNomenclature): FormGroup {
     const habForm = this._fb.group({
-      id_station: null,
       id_habitat: null,
       unique_id_sinp_hab: null,
       nom_cite: null,
@@ -141,8 +141,8 @@ export class OcchabFormService {
   }
 
   addNewHab() {
-    const currentHabNumber = this.stationForm.value.t_habitats.length - 1;
-    const habFormArray = this.stationForm.controls.t_habitats as FormArray;
+    const currentHabNumber = this.stationForm.value.habitats.length - 1;
+    const habFormArray = this.stationForm.controls.habitats as FormArray;
     habFormArray.insert(
       0,
       this.initHabForm(this._storeService.defaultNomenclature)
@@ -172,7 +172,7 @@ export class OcchabFormService {
    * @param index index of the habitat to delete
    */
   deleteHab(index) {
-    const habArrayForm = this.stationForm.controls.t_habitats as FormArray;
+    const habArrayForm = this.stationForm.controls.habitats as FormArray;
     habArrayForm.removeAt(index);
   }
 
@@ -208,7 +208,7 @@ export class OcchabFormService {
   }
 
   patchNomCite($event) {
-    const habArrayForm = this.stationForm.controls.t_habitats as FormArray;
+    const habArrayForm = this.stationForm.controls.habitats as FormArray;
     habArrayForm.controls[this.currentEditingHabForm].patchValue({
       nom_cite: $event.item.search_name
     });
@@ -235,7 +235,7 @@ export class OcchabFormService {
    */
   formatStationAndHabtoPatch(station) {
     // me    
-    const formatedHabitats = station.t_one_habitats.map(hab => {      
+    const formatedHabitats = station.t_one_habitats.map(hab => {
       // hab.habref["search_name"] = hab.nom_cite;
       return {
         ...hab,
@@ -250,12 +250,12 @@ export class OcchabFormService {
         id_nomenclature_abundance: this.getOrNull(hab, "abundance")
       };
     });
-    station.t_habitats.forEach((hab, index) => {
+    station.habitats.forEach((hab, index) => {
       formatedHabitats[index]["habref"] = hab.habref || {};
       formatedHabitats[index]["habref"]["search_name"] = hab.nom_cite;
       
     });    
-    station["t_habitats"] = formatedHabitats;    
+    station["habitats"] = formatedHabitats;
     return {
       ...station,
       date_min: this._dateParser.parse(station.date_min),
@@ -273,9 +273,9 @@ export class OcchabFormService {
   }
 
   patchStationForm(oneStation) {
-    // create t_habitat formArray
+    // create habitat formArray
     for (let i = 0; i < oneStation.properties.t_one_habitats.length; i++) {
-      (this.stationForm.controls.t_habitats as FormArray).push(
+      (this.stationForm.controls.habitats as FormArray).push(
         this.initHabForm(this._storeService.defaultNomenclature)
       );
     }
@@ -289,10 +289,10 @@ export class OcchabFormService {
   }
 
   /** Format a station before post */
-  formatStationBeforePost() {
+  formatStationBeforePost(): StationFeature {
     let formData = Object.assign({}, this.stationForm.value);
     //format cd_hab
-    formData.t_habitats.forEach(element => {
+    formData.habitats.forEach(element => {
       if (element.habref) {
         element.cd_hab = element.habref.cd_hab;
         delete element["habref"];
@@ -307,7 +307,7 @@ export class OcchabFormService {
 
     // format habitat nomenclatures
 
-    formData.t_habitats.forEach(element => {
+    formData.habitats.forEach(element => {
       this.formatNomenclature(element);
     });
 

@@ -22,7 +22,7 @@ export class ModalDeleteStation implements OnInit {
 
   deleteStation() {
     this.onDelete.emit();
-    this._occHabDataService.deleteOneStation(this.idStation).subscribe(
+    this._occHabDataService.deleteStation(this.idStation).subscribe(
       d => {
         this._commonService.regularToaster(
           "success",
