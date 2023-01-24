@@ -8,6 +8,7 @@ CHANGELOG
 
 - Synthèse : Agrégation des observations ayant la même géométrie (#1847) 
 - Synthèse : Possibilité d'afficher les données agrégées par maille (#1878)
+- Synthèse : Possibilité de définir des filtres par défaut (#2261)
 
 **💻 Développement**
 

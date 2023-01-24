@@ -326,6 +326,9 @@ class Synthese(Schema):
         ],
     )
 
+    # Filtres par défaut pour la synthese
+    DEFAULT_FILTERS = fields.Dict(load_default={})
+
     # --------------------------------------------------------------------
     # SYNTHESE - OBSERVATIONS LIST
     # Listes des champs renvoyés par l'API synthese '/synthese'

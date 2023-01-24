@@ -22,8 +22,14 @@ export class SyntheseSearchComponent implements OnInit {
   public taxonApiEndPoint = `${AppConfig.API_ENDPOINT}/synthese/taxons_autocomplete`;
   public validationStatus: Array<any>;
   private params: any;
+  public processedDefaultFilters: any;
 
   @Input() displayValidation = false;
+  // valeur des filtres par defaut
+  // les nomenclature sont données en liste de code de nomenclaure
+  // par exemple :
+  //    id_nomenclature_valid_status = ['0', '1', '2', '3', '5', '6']
+  @Input() defaultFilters = {};
   @Output() searchClicked = new EventEmitter();
   @Output() resetFilter = new EventEmitter();
 
@@ -74,6 +80,18 @@ export class SyntheseSearchComponent implements OnInit {
         this.formService.searchForm.controls.id_dataset.setValue([+this.params.id_dataset]);
       }
     }
+
+    // application des valeurs par defaut (input this.defaults)
+    this.formService
+      .processDefaultFilters(this.defaultFilters)
+      .subscribe((processedDefaultFilters) => {
+        this.processedDefaultFilters = processedDefaultFilters;
+        this.formService.searchForm.patchValue(this.processedDefaultFilters);
+        // Timeout sinon le patchValue n'a pas le temps de faire effet
+        setTimeout(() => {
+          this.onSubmitForm();
+        });
+      });
   }
 
   onSubmitForm() {
@@ -88,7 +106,7 @@ export class SyntheseSearchComponent implements OnInit {
     this.formService.selectedRedLists = [];
     this.formService.selectedStatus = [];
     this.formService.selectedTaxRefAttributs = [];
-    this.formService.searchForm.reset();
+    this.formService.searchForm.reset(this.processedDefaultFilters);
     this.resetFilter.emit();
 
     // refresh taxon tree
