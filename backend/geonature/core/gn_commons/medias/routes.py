@@ -124,11 +124,8 @@ def get_media_thumb(id_media, size):
     media_repo = TMediaRepository(id_media=id_media)
     m = media_repo.media
     if not m:
-        return {"msg": "Media introuvable"}, 404
+        raise NotFound("Media introuvable")
 
-    try:
-        url_thumb = media_repo.get_thumbnail_url(size)
-    except GeoNatureError as e:
-        return {"msg": str(e)}, 500
+    url_thumb = media_repo.get_thumbnail_url(size)
 
     return redirect(url_thumb)

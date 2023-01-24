@@ -77,7 +77,7 @@ class TMediaRepository:
             and (self.data["isFile"] is not True)
             and (self.media.media_path is not None)
         ):
-            (Path(current_app.config["BASE_DIR"]) / self.media.media_path).unlink()
+            self.media.remove(move=False)
             self.media.remove_thumbnails()
 
         # Si le média avait une url
@@ -122,7 +122,7 @@ class TMediaRepository:
                 raise Exception("Errors {}".format(exp.args))
 
     def absolute_file_path(self, thumbnail_height=None):
-        return os.path.join(current_app.config["BASE_DIR"], self.file_path(thumbnail_height))
+        return str(TMedias.base_dir() / self.file_path(thumbnail_height))
 
     def test_video_link(self):
         media_type = self.media_type()
@@ -193,14 +193,12 @@ class TMediaRepository:
             file_path = self.media.media_path
         else:
             file_path = os.path.join(
-                current_app.config["UPLOAD_FOLDER"],
                 str(self.media.id_table_location),
                 "{}.jpg".format(self.media.id_media),
             )
 
         if thumbnail_height:
             file_path = os.path.join(
-                current_app.config["UPLOAD_FOLDER"],
                 "thumbnails",
                 str(self.media.id_table_location),
                 "{}_thumbnail_{}.jpg".format(self.media.id_media, thumbnail_height),
@@ -222,17 +220,11 @@ class TMediaRepository:
 
         # @TODO récupérer les exceptions
         filename = "{}_{}".format(self.media.id_media, secure_filename(self.file.filename))
-        filedir = (
-            Path(current_app.config["BASE_DIR"])
-            / current_app.config["UPLOAD_FOLDER"]
-            / str(self.media.id_table_location)
-        )
+        filedir = TMedias.base_dir() / str(self.media.id_table_location)
         filedir.mkdir(parents=True, exist_ok=True)
         self.file.save(str(filedir / filename))
 
-        return os.path.join(
-            current_app.config["UPLOAD_FOLDER"], str(self.media.id_table_location), filename
-        )
+        return os.path.join("medias", str(self.media.id_table_location), filename)
 
     def is_img(self):
         return self.media_type() == "Photo"
@@ -315,7 +307,7 @@ class TMediaRepository:
         width = size / image.size[1] * image.size[0]
         image_thumb.thumbnail((width, size))
         thumb_path = self.absolute_file_path(size)
-        Path("/".join(thumb_path.split("/")[:-1])).mkdir(parents=True, exist_ok=True)
+        Path(thumb_path).parent.mkdir(parents=True, exist_ok=True)
 
         if image.mode in ("RGBA", "P"):
             image_thumb = image_thumb.convert("RGB")
@@ -335,11 +327,9 @@ class TMediaRepository:
             thumb_path = self.absolute_file_path(size)
 
         # Get relative path
-        relative_path = os.path.relpath(
-            thumb_path, os.path.join(current_app.config["BASE_DIR"], "static")
-        )
+        relative_path = os.path.relpath(thumb_path, current_app.config["MEDIA_FOLDER"])
         # Get URL
-        thumb_url = url_for("static", filename=relative_path)
+        thumb_url = url_for("media", filename=relative_path)
         return thumb_url
 
     def delete(self):
@@ -410,7 +400,7 @@ class TMediumRepository:
 
         # liste des id des medias fichiers
         liste_fichiers = []
-        search_path = Path(current_app.config["BASE_DIR"], current_app.config["UPLOAD_FOLDER"])
+        search_path = TMedias.base_dir()
         for (repertoire, sous_repertoires, fichiers) in os.walk(search_path):
             for f in fichiers:
                 id_media = f.split("_")[0]

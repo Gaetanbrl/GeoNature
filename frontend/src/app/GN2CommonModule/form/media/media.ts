@@ -62,26 +62,14 @@ class Media {
     return data;
   }
 
-  filePath(thumbnailHeight = null) {
-    let filePath;
-    if (this.media_path) {
-      filePath = this.media_path;
-    } else if (this.media_url) {
-      filePath = `${this.config.UPLOAD_FOLDER}/${this.id_table_location}/${this.id_media}`;
-    }
-
-    if (thumbnailHeight) {
-      filePath = `gn_commons/media/thumbnails/${this.id_media}/${thumbnailHeight}`;
-    }
-
-    return filePath;
-  }
-
   href(thumbnailHeight = null): string {
     if (thumbnailHeight) {
-      return `${this.config.API_ENDPOINT}/${this.filePath(thumbnailHeight)}`;
+      let filePath = `gn_commons/media/thumbnails/${this.id_media}/${thumbnailHeight}`;
+      return `${this.config.API_ENDPOINT}/${filePath}`;
     }
-    return this.media_path ? `${this.config.API_ENDPOINT}/${this.media_path}` : this.media_url;
+    return this.media_path
+      ? `${this.config.API_ENDPOINT}/${this.config.MEDIA_URL}/attachments/${this.media_path}`
+      : this.media_url;
   }
 
   valid(): boolean {
